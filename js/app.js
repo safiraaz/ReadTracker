@@ -389,10 +389,14 @@ async function saveItem() {
   saveBtn.disabled = true;
   saveBtn.innerHTML = `<span class="scan-spinner"></span> Menyimpan...`;
 
+  // Ambil nilai status dan ubah ke huruf kecil agar lolos validasi CHECK di SQL
+  const rawSeriesStatus = document.getElementById('m-sst').value || 'ongoing';
+  const cleanSeriesStatus = rawSeriesStatus.toLowerCase();
+
   const payload = {
     title,
     type: document.getElementById('m-type').value,
-    seriesStatus: document.getElementById('m-sst').value,
+    seriesStatus: cleanSeriesStatus, // Sudah dipastikan huruf kecil!
     chapter: parseInt(document.getElementById('m-ch').value)||0,
     totalChapter: parseInt(document.getElementById('m-total').value)||0,
     status: document.getElementById('m-status').value,
@@ -419,13 +423,13 @@ async function saveItem() {
     } else {
       payload.cover = modalCoverImage ? '📖' : autoEmoji(title, modalGenres);
       const saved = await insertItem(state.user.id, payload);
-      saved.genres = [...modalGenres]; // genres not in DB row, local only for now
+      saved.genres = [...modalGenres]; 
       state.items.unshift(saved);
       showToast('Ditambahkan!');
     }
     closeModal(); render();
   } catch(e) {
-    console.error(e);
+    console.error("Gagal simpan:", e);
     showToast('Gagal menyimpan ke server.', I.warning);
   }
 
@@ -527,62 +531,61 @@ async function importData(e) {
       const existingTitles = new Set(state.items.map(x => x.title.toLowerCase().trim()));
       const itemsToInsert = [];
       
-      // 1. Kumpulkan semua item baru yang belum ada di database ke dalam array
+      // 1. Kumpulkan semua item baru & paksa seriesStatus jadi huruf kecil
       for (const item of imported.items) {
         if (existingTitles.has(item.title.toLowerCase().trim())) continue;
         
         const { id, ...cleanItem } = item; 
         
-        // Sanitisasi data agar sesuai skema database Supabase kamu
         cleanItem.genres = item.genres || [];
         cleanItem.altTitles = item.altTitles || [];
         cleanItem.links = item.links || [];
         cleanItem.added = item.added || Date.now();
+        
+        // Memastikan isi JSON lama dipaksa jadi huruf kecil ('ongoing', 'completed', dll)
+        if (item.seriesStatus) {
+          cleanItem.seriesStatus = item.seriesStatus.toLowerCase();
+        } else {
+          cleanItem.seriesStatus = 'ongoing';
+        }
 
         itemsToInsert.push(cleanItem);
       }
 
       let addedCount = 0;
 
-      // 2. Tembak sekaligus ke Supabase (Bulk Insert) jika ada item baru
+      // 2. Kirim massal ke database Supabase
       if (itemsToInsert.length > 0) {
-        // PENTING: Pastikan db.js kamu mendukung pengiriman array objek untuk insertItem!
-        // Jika insertItem hanya menerima 1 objek, kita kirim array-nya lewat pembungkus
         const savedItems = await insertItem(state.user.id, itemsToInsert);
-        
-        // Masukkan data yang berhasil disimpan ke state lokal agar langsung muncul di UI
         if (Array.isArray(savedItems)) {
           state.items.push(...savedItems);
           addedCount = savedItems.length;
-        } else if (savedItems) {
-          // Jaga-jaga jika insertItem mengembalikan single object atau respons modifikasi
+        } else {
           state.items.push(...itemsToInsert);
           addedCount = itemsToInsert.length;
         }
       }
       
-      // 3. Update master genre agar tidak duplikat di local state
+      // 3. Masukkan master genre ke local state tracker
       const newGenres = imported.genres || [];
       newGenres.forEach(g => { 
         if (!state.genres.includes(g)) state.genres.push(g); 
       });
 
-      // 4. Amankan fungsi bulk genre jika fungsinya rawan crash
+      // 4. Kirim genre baru. Jika error 'unique constraint' di database, abaikan lewat catch
       if (newGenres.length > 0) {
         try {
           await insertGenresBulk(state.user.id, newGenres);
         } catch (genreErr) {
-          console.warn("Gagal simpan master genre ke DB, tapi data komik aman:", genreErr);
+          console.warn("Master genre sudah ada di database, dilewati safely.");
         }
       }
       
-      // Jalankan ulang penyusunan UI
       render();
       showToast(addedCount > 0 ? `${addedCount} judul berhasil di-import!` : 'Semua judul sudah ada.');
     } catch (err) { 
-      // CEK KONSOL BROWSER KAMU (Tekan F12 -> klik tab Console) untuk melihat pesan aslinya!
-      console.error("--- DETAIL ERROR IMPOR ---", err); 
-      showToast('Gagal memproses file JSON!', I.warning); 
+      console.error("Detail Error Impor:", err); 
+      showToast('File tidak valid atau ditolak database!', I.warning); 
     }
     e.target.value = '';
   };
