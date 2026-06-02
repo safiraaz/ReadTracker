@@ -418,8 +418,7 @@ body {
 a.card-title:hover { color: var(--accent2); }
 .alt-titles { 
   font-size: 11px; 
-  color: var(--text) !important; 
-  opacity: 0.8 !important;      
+  color: var(--text) !important;  
   margin-bottom: 4px; 
   line-height: 1.4; 
 }
