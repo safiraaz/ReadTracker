@@ -526,24 +526,25 @@ async function importData(e) {
   reader.onload = async (ev) => {
     try {
       const imported = JSON.parse(ev.target.result);
-      if (!imported.items || !Array.isArray(imported.items)) throw new Error('Format JSON salah atau tidak dikenali.');
+      if (!imported.items || !Array.isArray(imported.items)) throw new Error('Format salah');
       
       const existingTitles = new Set(state.items.map(x => x.title.toLowerCase().trim()));
-      let addedCount = 0;
+      let added = 0;
       
-      // 1. Jalankan loop satu per satu karena insertItem di db.js wajib .single()
+      // Jalankan looping satu per satu dengan aman sesuai desain db.js
       for (const item of imported.items) {
         if (existingTitles.has(item.title.toLowerCase().trim())) continue;
         
-        // Buat salinan data bersih tanpa menyertakan ID lama
+        // Buat salinan data tanpa membawa ID lama agar Supabase membuat ID baru otomatis
         const { id, ...cleanItem } = item; 
         
+        // Pastikan field penting tidak kosong
         cleanItem.genres = item.genres || [];
         cleanItem.altTitles = item.altTitles || [];
         cleanItem.links = item.links || [];
         cleanItem.added = item.added || Date.now();
         
-        // Paksa status seri jadi huruf kecil agar lolos validasi CHECK constraint di SQL kamu
+        // Paksa status seri jadi huruf kecil agar lolos check constraint di SQL
         if (item.seriesStatus) {
           cleanItem.seriesStatus = item.seriesStatus.toLowerCase();
         } else {
@@ -551,48 +552,43 @@ async function importData(e) {
         }
 
         try {
-          // Kirim satu per satu secara asinkronus yang aman
+          // Kirim per objek secara asinkronus ke Supabase
           const saved = await insertItem(state.user.id, cleanItem);
           
-          // Sinkronisasi data ke state lokal aplikasi
           if (saved) {
-            saved.genres = cleanItem.genres; // Tempel kembali genre lokalnya
-            state.items.push(saved);
+            saved.genres = cleanItem.genres; // Selipkan genre lokal untuk UI
+            state.items.unshift(saved); // unshift agar komik baru langsung muncul di paling atas list UI
           } else {
-            // Jaga-jaga jika Supabase berhasil tapi tidak me-return data select
-            cleanItem.id = Date.now() + Math.random(); // ID sementara buat UI lokal
-            state.items.push(cleanItem);
+            cleanItem.id = Date.now() + Math.random();
+            state.items.unshift(cleanItem);
           }
           
           existingTitles.add(cleanItem.title.toLowerCase().trim());
-          addedCount++;
+          added++;
         } catch (dbErr) {
-          // Jika ada 1 komik yang gagal karena masalah teks/karakter, skip komik ini dan lanjut ke komik berikutnya
-          console.warn(`Gagal mengimpor judul "${cleanItem.title}":`, dbErr);
+          // Jika ada 1 komik bermasalah teksnya, abaikan safely dan lanjut ke komik berikutnya
+          console.warn(`Gagal menyimpan judul "${cleanItem.title}":`, dbErr);
         }
       }
       
-      // 2. Update master kumpulan genre unik di state aplikasi
+      // Masukkan master genre ke local state tracker
       const newGenres = imported.genres || [];
-      newGenres.forEach(g => { 
-        if (!state.genres.includes(g)) state.genres.push(g); 
-      });
-
-      // 3. Simpan master genre ke database (Bungkus dengan try-catch biar kalau error DB, data komik di atas tetep aman tersimpan)
+      newGenres.forEach(g => { if (!state.genres.includes(g)) state.genres.push(g); });
+      
       if (newGenres.length > 0) {
         try {
           await insertGenresBulk(state.user.id, newGenres);
         } catch (genreErr) {
-          console.warn("Gagal sinkronisasi tabel user_genres ke DB, tapi data komik aman:", genreErr);
+          console.warn("Master genre sudah ada, diabaikan safely.");
         }
       }
       
-      // Gambar ulang UI Reading Tracker kamu
+      // Gambar ulang UI aplikasi
       render();
-      showToast(addedCount > 0 ? `${addedCount} judul berhasil di-import!` : 'Semua judul sudah ada.');
+      showToast(added > 0 ? `${added} judul berhasil di-import!` : 'Semua judul sudah ada.');
     } catch (err) { 
-      console.error("Detail Error Fatal Impor:", err); 
-      showToast('Gagal memproses file JSON!', I.warning); 
+      console.error("--- DETAIL ERROR IMPOR ---", err); 
+      showToast('File tidak valid!', I.warning); 
     }
     e.target.value = '';
   };
