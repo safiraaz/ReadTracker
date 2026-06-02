@@ -416,7 +416,13 @@ body {
   transition: color 0.13s;
 }
 a.card-title:hover { color: var(--accent2); }
-.alt-titles { font-size: 11px; color: var(--muted2); margin-bottom: 4px; line-height: 1.4; }
+.alt-titles { 
+  font-size: 11px; 
+  color: var(--text); 
+  opacity: 0.7;      
+  margin-bottom: 4px; 
+  line-height: 1.4; 
+}
 
 .tags-row { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
 .badge {
