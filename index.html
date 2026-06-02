@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reading Tracker</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <h1 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-0.5px;">📚 Tracker</h1>
+      <div class="stats-badge" id="globalStats">0 Judul</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="icon-action-btn" onclick="openScanModal()" title="Scan Screenshot">📸 Scan AI</button>
+      <button class="icon-action-btn" onclick="document.getElementById('importFile').click()" title="Import JSON">📥 Import</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+      <button class="icon-action-btn" onclick="exportData()" title="Export JSON">📤 Export</button>
+      
+      <button class="btn-danger" id="deleteAllBtn" onclick="deleteAll()" title="Hapus semua data">🗑 Reset</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-wrapper">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="searchBar" placeholder="Cari judul atau nama alternatif..." oninput="render()">
+    </div>
+    <div class="filter-group">
+      <select class="filter-select" id="filterType" onchange="render()">
+        <option value="all">Semua Tipe</option>
+        <option value="Manhwa">Manhwa</option>
+        <option value="Manga">Manga</option>
+        <option value="Manhua">Manhua</option>
+      </select>
+      <select class="filter-select" id="filterStatus" onchange="render()">
+        <option value="all">Semua Status</option>
+        <option value="Reading">📖 Reading</option>
+        <option value="Completed">✅ Completed</option>
+        <option value="Plan to Read">⏳ Plan to Read</option>
+        <option value="On Hold">⏸️ On Hold</option>
+        <option value="Dropped">❌ Dropped</option>
+      </select>
+      <select class="filter-select" id="sortBy" onchange="render()">
+        <option value="latest">Terbaru Ditambahkan</option>
+        <option value="alphabet">Abjad (A-Z)</option>
+        <option value="rating">Rating Tertinggi</option>
+        <option value="chapter">Chapter Tertinggi</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="genre-container" id="genreFilters"></div>
+
+  <div class="grid" id="trackerGrid"></div>
+
+  <div class="modal" id="entryModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">Tambah Judul Baru</h3>
+        <button class="close-btn" onclick="closeModal()">×</button>
+      </div>
+      <div class="form-grid">
+        <div class="form-group" style="grid-column: span 2;">
+          <label>Judul Utama <span style="color:var(--red)">*</span></label>
+          <input type="text" id="mTitle" required placeholder="Masukkan judul utama...">
+        </div>
+        <div class="form-group" style="grid-column: span 2;">
+          <label>Judul Alternatif (Pisah dengan koma)</label>
+          <input type="text" id="mAltTitles" placeholder="Contoh: Solo Leveling, Na Honjaman Level Up">
+        </div>
+        <div class="form-group">
+          <label>Tipe</label>
+          <select id="mType">
+            <option value="Manhwa">Manhwa</option>
+            <option value="Manga">Manga</option>
+            <option value="Manhua">Manhua</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status Baca</label>
+          <select id="mStatus">
+            <option value="Reading">Reading</option>
+            <option value="Completed">Completed</option>
+            <option value="Plan to Read">Plan to Read</option>
+            <option value="On Hold">On Hold</option>
+            <option value="Dropped">Dropped</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status Serial</label>
+          <select id="mSeriesStatus">
+            <option value="ongoing">Ongoing</option>
+            <option value="completed">Completed</option>
+            <option value="hiatus">Hiatus</option>
+            <option value="dropped">Dropped</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Rating</label>
+          <div class="star-rating-input" id="mRatingStars">
+            <span data-val="1">★</span><span data-val="2">★</span><span data-val="3">★</span><span data-val="4">★</span><span data-val="5">★</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Chapter Sekarang</label>
+          <input type="number" id="mChapter" min="0" value="0">
+        </div>
+        <div class="form-group">
+          <label>Total Chapter (0 jika unknown)</label>
+          <input type="number" id="mTotalChapter" min="0" value="0">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:12px;">
+        <label>Genre</label>
+        <div style="display:flex;gap:6px;margin-bottom:8px;">
+          <input type="text" id="newGenreInput" placeholder="Tambah genre baru..." style="flex:1;padding:6px 10px;font-size:12px;">
+          <button type="button" class="icon-action-btn" onclick="addNewGenreData()" style="padding:0 12px;font-size:12px;">+</button>
+        </div>
+        <div class="genre-picker" id="modalGenrePicker"></div>
+      </div>
+
+      <div class="form-group" style="margin-top:12px;">
+        <label style="display:flex;justify-content:between;align-items:center;">
+          <span>Links / Sumber Bacaan</span>
+          <button type="button" class="icon-action-btn" onclick="addLinkFormRow()" style="font-size:11px;padding:2px 8px;">+ Tambah Link</button>
+        </label>
+        <div id="linkRowsContainer" style="display:flex;flex-direction:column;gap:6px;margin-top:6px;"></div>
+      </div>
+
+      <div class="form-group" style="margin-top:12px;">
+        <label>Catatan / Notes</label>
+        <textarea id="mNotes" rows="3" placeholder="Tulis sinopsis singkat atau review pribadi..."></textarea>
+      </div>
+
+      <div class="form-group" style="margin-top:12px;">
+        <label>Cover Gambar (Otomatis deteksi emoji jika kosong)</label>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <button type="button" class="icon-action-btn" onclick="document.getElementById('coverFile').click()">📁 Upload Gambar</button>
+          <input type="file" id="coverFile" accept="image/*" style="display:none" onchange="handleCoverUpload(event)">
+          <div id="coverPreview" style="font-size:12px;color:var(--muted)">Tidak ada gambar (Menggunakan Emoji otomatis)</div>
+          <button type="button" id="btnRemoveCover" class="icon-action-btn" onclick="removeUploadedCover()" style="display:none;color:var(--red);border-color:var(--red)">Hapus</button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="icon-action-btn" onclick="closeModal()">Batal</button>
+        <button class="icon-action-btn" onclick="saveEntry()" style="background:var(--accent);color:#fff;border:none;padding:10px 20px;">Simpan Data</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="scanModal">
+    <div class="modal-content" style="max-width:500px;">
+      <div class="modal-header">
+        <h3>📸 Scan Screenshot AI (Anthropic Claude)</h3>
+        <button class="close-btn" onclick="closeScanModal()">×</button>
+      </div>
+      <div class="form-group" style="margin-top:12px;">
+        <label>API Key Anthropic Claude</label>
+        <input type="password" id="scanApiKey" placeholder="sk-ant-...">
+        <p style="font-size:11px;color:var(--muted);margin:4px 0 0 0;">Key disimpan lokal di browser Anda.</p>
+      </div>
+      <div class="form-group" style="margin-top:12px;">
+        <label>Pilih Gambar Screenshot Daftar Bacaan</label>
+        <input type="file" id="scanFile" accept="image/*">
+      </div>
+      <div id="scanStatus" style="margin-top:12px;font-size:13px;display:none;padding:10px;border-radius:var(--radius-sm);background:var(--surface2)"></div>
+      <div class="modal-footer" style="margin-top:20px;">
+        <button class="icon-action-btn" onclick="closeScanModal()">Batal</button>
+        <button class="icon-action-btn" onclick="processScan()" style="background:var(--green);color:#fff;border:none;">Mulai Analisis</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="reader-backdrop" id="readerBackdrop">
+    <div class="reader-topbar">
+      <button class="reader-nav-btn" onclick="exitReader()">⬅ Kembali</button>
+      <div class="reader-title-info" id="readerTitleInfo">Judul Manhwa - Chapter 0</div>
+      <div style="display:flex;gap:8px;">
+        <button class="reader-nav-btn" onclick="toggleReaderFullscreen()">📺 Fullscreen</button>
+        <button class="reader-nav-btn" onclick="exitReader()" style="background:var(--red);color:#fff;">✕ Tutup</button>
+      </div>
+    </div>
+    <div class="reader-content" id="readerContent" onscroll="handleReaderScroll()"></div>
+    <div class="reader-bottom-nav">
+      <button class="reader-nav-btn" id="readerPrevBtn" onclick="navigateChapter(-1)">⏮ Prev Ch</button>
+      <button class="reader-nav-btn" id="readerNextBtn" onclick="navigateChapter(1)">Next Ch ⏭</button>
+    </div>
+  </div>
+
+  <button class="fab" onclick="openModal()" title="Tambah Judul">+</button>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
