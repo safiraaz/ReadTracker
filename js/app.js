@@ -526,15 +526,16 @@ async function importData(e) {
   reader.onload = async (ev) => {
     try {
       const imported = JSON.parse(ev.target.result);
-      if (!imported.items || !Array.isArray(imported.items)) throw new Error('Format salah');
+      if (!imported.items || !Array.isArray(imported.items)) throw new Error('Format JSON salah atau tidak dikenali.');
       
       const existingTitles = new Set(state.items.map(x => x.title.toLowerCase().trim()));
-      const itemsToInsert = [];
+      let addedCount = 0;
       
-      // 1. Kumpulkan semua item baru & paksa seriesStatus jadi huruf kecil
+      // 1. Jalankan loop satu per satu karena insertItem di db.js wajib .single()
       for (const item of imported.items) {
         if (existingTitles.has(item.title.toLowerCase().trim())) continue;
         
+        // Buat salinan data bersih tanpa menyertakan ID lama
         const { id, ...cleanItem } = item; 
         
         cleanItem.genres = item.genres || [];
@@ -542,50 +543,56 @@ async function importData(e) {
         cleanItem.links = item.links || [];
         cleanItem.added = item.added || Date.now();
         
-        // Memastikan isi JSON lama dipaksa jadi huruf kecil ('ongoing', 'completed', dll)
+        // Paksa status seri jadi huruf kecil agar lolos validasi CHECK constraint di SQL kamu
         if (item.seriesStatus) {
           cleanItem.seriesStatus = item.seriesStatus.toLowerCase();
         } else {
           cleanItem.seriesStatus = 'ongoing';
         }
 
-        itemsToInsert.push(cleanItem);
-      }
-
-      let addedCount = 0;
-
-      // 2. Kirim massal ke database Supabase
-      if (itemsToInsert.length > 0) {
-        const savedItems = await insertItem(state.user.id, itemsToInsert);
-        if (Array.isArray(savedItems)) {
-          state.items.push(...savedItems);
-          addedCount = savedItems.length;
-        } else {
-          state.items.push(...itemsToInsert);
-          addedCount = itemsToInsert.length;
+        try {
+          // Kirim satu per satu secara asinkronus yang aman
+          const saved = await insertItem(state.user.id, cleanItem);
+          
+          // Sinkronisasi data ke state lokal aplikasi
+          if (saved) {
+            saved.genres = cleanItem.genres; // Tempel kembali genre lokalnya
+            state.items.push(saved);
+          } else {
+            // Jaga-jaga jika Supabase berhasil tapi tidak me-return data select
+            cleanItem.id = Date.now() + Math.random(); // ID sementara buat UI lokal
+            state.items.push(cleanItem);
+          }
+          
+          existingTitles.add(cleanItem.title.toLowerCase().trim());
+          addedCount++;
+        } catch (dbErr) {
+          // Jika ada 1 komik yang gagal karena masalah teks/karakter, skip komik ini dan lanjut ke komik berikutnya
+          console.warn(`Gagal mengimpor judul "${cleanItem.title}":`, dbErr);
         }
       }
       
-      // 3. Masukkan master genre ke local state tracker
+      // 2. Update master kumpulan genre unik di state aplikasi
       const newGenres = imported.genres || [];
       newGenres.forEach(g => { 
         if (!state.genres.includes(g)) state.genres.push(g); 
       });
 
-      // 4. Kirim genre baru. Jika error 'unique constraint' di database, abaikan lewat catch
+      // 3. Simpan master genre ke database (Bungkus dengan try-catch biar kalau error DB, data komik di atas tetep aman tersimpan)
       if (newGenres.length > 0) {
         try {
           await insertGenresBulk(state.user.id, newGenres);
         } catch (genreErr) {
-          console.warn("Master genre sudah ada di database, dilewati safely.");
+          console.warn("Gagal sinkronisasi tabel user_genres ke DB, tapi data komik aman:", genreErr);
         }
       }
       
+      // Gambar ulang UI Reading Tracker kamu
       render();
       showToast(addedCount > 0 ? `${addedCount} judul berhasil di-import!` : 'Semua judul sudah ada.');
     } catch (err) { 
-      console.error("Detail Error Impor:", err); 
-      showToast('File tidak valid atau ditolak database!', I.warning); 
+      console.error("Detail Error Fatal Impor:", err); 
+      showToast('Gagal memproses file JSON!', I.warning); 
     }
     e.target.value = '';
   };
