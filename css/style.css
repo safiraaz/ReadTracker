@@ -146,7 +146,7 @@ body {
 .auth-submit:disabled { opacity: 0.4; cursor: not-allowed; }
 .auth-error {
   background: var(--red-dim);
-  border: 1px solid rgba(255,87,87,0.2);
+  border: 1px solid rgba(196,122,122,0.2);
   border-radius: var(--radius-xs);
   padding: 9px 13px;
   font-size: 12px;
@@ -158,7 +158,7 @@ body {
   font-size: 12px;
   color: var(--amber);
   background: var(--amber-dim);
-  border: 1px solid rgba(255,173,59,0.2);
+  border: 1px solid rgba(212,197,169,0.2);
   border-radius: var(--radius-xs);
   padding: 8px 12px;
   line-height: 1.5;
@@ -382,7 +382,7 @@ body {
 }
 .card:hover { border-color: var(--border2); transform: translateY(-1px); box-shadow: 0 8px 32px rgba(0,0,0,0.35); }
 
-.card-main { display: grid; grid-template-columns: 56px 1fr; }
+.card-main { display: grid; grid-template-columns: 56px 1fr; align-items: stretch; }
 .cover {
   width: 56px;
   min-height: 88px;
@@ -391,6 +391,7 @@ body {
   background: var(--surface2);
   flex-shrink: 0;
   position: relative;
+  align-self: stretch;
 }
 .cover::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 1px; background: var(--border); }
 .cover img { width: 56px; height: 100%; object-fit: cover; min-height: 88px; display: block; }
@@ -408,7 +409,7 @@ body {
   transition: color 0.13s;
 }
 a.card-title:hover { color: var(--accent2); }
-.alt-titles { font-size: 11px; color: var(--muted2); margin-bottom: 4px; line-height: 1.4; }
+.alt-titles { font-size: 11px; color: var(--muted); margin-bottom: 4px; line-height: 1.4; }
 
 .tags-row { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
 .badge {
@@ -580,7 +581,7 @@ a.card-title:hover { color: var(--accent2); }
   color: var(--muted); cursor: pointer; transition: all 0.13s;
 }
 .genre-pick-chip:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-.genre-pick-chip.selected { background: var(--accent-dim); color: var(--accent2); border-color: rgba(232,80,106,0.35); }
+.genre-pick-chip.selected { background: var(--accent-dim); color: var(--accent2); border-color: rgba(212,197,169,0.3); }
 .genre-add-row { display: flex; gap: 7px; margin-top: 8px; }
 .genre-add-input {
   flex: 1; background: var(--surface2); border: 1px solid var(--border2);
