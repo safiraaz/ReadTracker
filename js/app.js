@@ -522,23 +522,44 @@ async function importData(e) {
   reader.onload = async (ev) => {
     try {
       const imported = JSON.parse(ev.target.result);
-      if (!imported.items||!Array.isArray(imported.items)) throw new Error('Format salah');
-      const existingTitles = new Set(state.items.map(x=>x.title.toLowerCase().trim()));
+      if (!imported.items || !Array.isArray(imported.items)) throw new Error('Format salah');
+      
+      const existingTitles = new Set(state.items.map(x => x.title.toLowerCase().trim()));
       let added = 0;
+      
       for (const item of imported.items) {
         if (existingTitles.has(item.title.toLowerCase().trim())) continue;
-        const saved = await insertItem(state.user.id, item);
-        saved.genres = item.genres||[];
+        
+        // --- PROSES SANITISASI DATA (PERBAIKAN DI SINI) ---
+        // Kita buat salinan data tanpa membawa ID lama agar tidak tabrakan di Supabase
+        const { id, ...cleanItem } = item; 
+        
+        // Pastikan array genre dan altTitles minimal berbentuk array kosong jika tidak ada
+        cleanItem.genres = item.genres || [];
+        cleanItem.altTitles = item.altTitles || [];
+        cleanItem.links = item.links || [];
+        cleanItem.added = item.added || Date.now(); // Gunakan timestamp jika kosong
+
+        // Kirim data yang sudah bersih ke database
+        const saved = await insertItem(state.user.id, cleanItem);
+        saved.genres = cleanItem.genres;
+        
         state.items.push(saved);
-        existingTitles.add(item.title.toLowerCase().trim());
+        existingTitles.add(cleanItem.title.toLowerCase().trim());
         added++;
       }
-      (imported.genres||[]).forEach(g=>{ if(!state.genres.includes(g)) state.genres.push(g); });
-      await insertGenresBulk(state.user.id, imported.genres||[]);
+      
+      // Impor master genre jika ada
+      (imported.genres || []).forEach(g => { if (!state.genres.includes(g)) state.genres.push(g); });
+      await insertGenresBulk(state.user.id, imported.genres || []);
+      
       render();
-      showToast(added>0?`${added} judul di-import!`:'Semua judul sudah ada.');
-    } catch(err) { showToast('File tidak valid!', I.warning); }
-    e.target.value='';
+      showToast(added > 0 ? `${added} judul berhasil di-import!` : 'Semua judul sudah ada.');
+    } catch (err) { 
+      console.error("Detail Error Impor:", err); // Ini membantu kamu melihat error asli di Inspect Element (Console)
+      showToast('File tidak valid atau gagal disimpan!', I.warning); 
+    }
+    e.target.value = '';
   };
   reader.readAsText(file);
 }
