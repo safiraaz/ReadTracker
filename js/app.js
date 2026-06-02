@@ -525,39 +525,64 @@ async function importData(e) {
       if (!imported.items || !Array.isArray(imported.items)) throw new Error('Format salah');
       
       const existingTitles = new Set(state.items.map(x => x.title.toLowerCase().trim()));
-      let added = 0;
+      const itemsToInsert = [];
       
+      // 1. Kumpulkan semua item baru yang belum ada di database ke dalam array
       for (const item of imported.items) {
         if (existingTitles.has(item.title.toLowerCase().trim())) continue;
         
-        // --- PROSES SANITISASI DATA (PERBAIKAN DI SINI) ---
-        // Kita buat salinan data tanpa membawa ID lama agar tidak tabrakan di Supabase
         const { id, ...cleanItem } = item; 
         
-        // Pastikan array genre dan altTitles minimal berbentuk array kosong jika tidak ada
+        // Sanitisasi data agar sesuai skema database Supabase kamu
         cleanItem.genres = item.genres || [];
         cleanItem.altTitles = item.altTitles || [];
         cleanItem.links = item.links || [];
-        cleanItem.added = item.added || Date.now(); // Gunakan timestamp jika kosong
+        cleanItem.added = item.added || Date.now();
 
-        // Kirim data yang sudah bersih ke database
-        const saved = await insertItem(state.user.id, cleanItem);
-        saved.genres = cleanItem.genres;
+        itemsToInsert.push(cleanItem);
+      }
+
+      let addedCount = 0;
+
+      // 2. Tembak sekaligus ke Supabase (Bulk Insert) jika ada item baru
+      if (itemsToInsert.length > 0) {
+        // PENTING: Pastikan db.js kamu mendukung pengiriman array objek untuk insertItem!
+        // Jika insertItem hanya menerima 1 objek, kita kirim array-nya lewat pembungkus
+        const savedItems = await insertItem(state.user.id, itemsToInsert);
         
-        state.items.push(saved);
-        existingTitles.add(cleanItem.title.toLowerCase().trim());
-        added++;
+        // Masukkan data yang berhasil disimpan ke state lokal agar langsung muncul di UI
+        if (Array.isArray(savedItems)) {
+          state.items.push(...savedItems);
+          addedCount = savedItems.length;
+        } else if (savedItems) {
+          // Jaga-jaga jika insertItem mengembalikan single object atau respons modifikasi
+          state.items.push(...itemsToInsert);
+          addedCount = itemsToInsert.length;
+        }
       }
       
-      // Impor master genre jika ada
-      (imported.genres || []).forEach(g => { if (!state.genres.includes(g)) state.genres.push(g); });
-      await insertGenresBulk(state.user.id, imported.genres || []);
+      // 3. Update master genre agar tidak duplikat di local state
+      const newGenres = imported.genres || [];
+      newGenres.forEach(g => { 
+        if (!state.genres.includes(g)) state.genres.push(g); 
+      });
+
+      // 4. Amankan fungsi bulk genre jika fungsinya rawan crash
+      if (newGenres.length > 0) {
+        try {
+          await insertGenresBulk(state.user.id, newGenres);
+        } catch (genreErr) {
+          console.warn("Gagal simpan master genre ke DB, tapi data komik aman:", genreErr);
+        }
+      }
       
+      // Jalankan ulang penyusunan UI
       render();
-      showToast(added > 0 ? `${added} judul berhasil di-import!` : 'Semua judul sudah ada.');
+      showToast(addedCount > 0 ? `${addedCount} judul berhasil di-import!` : 'Semua judul sudah ada.');
     } catch (err) { 
-      console.error("Detail Error Impor:", err); // Ini membantu kamu melihat error asli di Inspect Element (Console)
-      showToast('File tidak valid atau gagal disimpan!', I.warning); 
+      // CEK KONSOL BROWSER KAMU (Tekan F12 -> klik tab Console) untuk melihat pesan aslinya!
+      console.error("--- DETAIL ERROR IMPOR ---", err); 
+      showToast('Gagal memproses file JSON!', I.warning); 
     }
     e.target.value = '';
   };
