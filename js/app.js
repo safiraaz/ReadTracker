@@ -194,6 +194,7 @@ function render() {
   });
 
   if (sortBy === 'title') list.sort((a,b) => a.title.localeCompare(b.title));
+  else if (sortBy === 'updated') list.sort((a,b) => b.updatedAt - a.updatedAt);
   else if (sortBy === 'chapter') list.sort((a,b) => b.chapter - a.chapter);
   else if (sortBy === 'rating') list.sort((a,b) => b.rating - a.rating);
   else list.sort((a,b) => b.added - a.added);
