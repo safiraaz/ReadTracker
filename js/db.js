@@ -83,11 +83,9 @@ export async function migrateFromLocalStorage(userId) {
     if (!raw) return { items: 0, genres: 0 };
     const local = JSON.parse(raw);
 
-    // insert genres
     const genres = local.genres || [];
     await insertGenresBulk(userId, genres);
 
-    // insert items
     const items = local.items || [];
     if (items.length) {
       const rows = items.map(item => localToDb(userId, item));
@@ -107,7 +105,6 @@ export async function migrateFromLocalStorage(userId) {
 // ======= FIELD MAPPING =======
 
 function localToDb(userId, item) {
-  // Encode genres into cover field: "emoji||genre1,genre2"
   const emoji = item.cover || '';
   const genres = (item.genres || []).join(',');
   const coverEncoded = genres ? `${emoji}||${genres}` : emoji;
@@ -125,15 +122,14 @@ function localToDb(userId, item) {
     cover: coverEncoded,
     cover_image: item.coverImage || null,
     links: item.links || [],
+    updated_at: new Date().toISOString(),
   };
   if (userId) row.user_id = userId;
-  // preserve numeric id from localStorage for migration (bigint compatible)
   if (item.id && typeof item.id === 'number') row.id = item.id;
   return row;
 }
 
 function dbToLocal(row) {
-  // Decode genres from cover field: "emoji||genre1,genre2"
   const coverRaw = row.cover || '';
   let emoji = coverRaw;
   let genres = [];
@@ -159,5 +155,8 @@ function dbToLocal(row) {
     links: row.links || [],
     genres,
     added: new Date(row.created_at).getTime(),
+    updatedAt: row.updated_at
+      ? new Date(row.updated_at).getTime()
+      : new Date(row.created_at).getTime(),
   };
 }
