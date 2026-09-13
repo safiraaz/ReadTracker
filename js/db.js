@@ -8,7 +8,7 @@ export async function fetchItems(userId) {
     .from('tracker_items')
     .select('*')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+    .order('updated_at', { ascending: false });
   if (error) throw error;
   return data.map(dbToLocal);
 }
