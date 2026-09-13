@@ -23,7 +23,7 @@ const I = {
 
 // ======= STATE =======
 const DEFAULT_GENRES = ['Action','Romance','Fantasy','Isekai','Historical','System','Regression','Reincarnation','Martial Arts','School','Horror','Comedy','Mystery','Sci-Fi','Slice of Life','Dungeon','Villainess','Murim','Hunter'];
-const STATUSES = ['Reading','Completed','Plan to Read','On Hold','Dropped'];
+const STATUSES = ['Reading','Completed','Plan to Read','On Hold', 'Unread','Dropped'];
 const COVERS = ['🐉','⚔️','🌸','👊','💀','🔮','🗡️','🌙','🔥','🌊','⚡','🦊','🏯','👁️','🧬','🗺️','💎','🎭','🧿','🐺'];
 
 const GENRE_EMOJI = {'Action':'⚔️','Romance':'💕','Fantasy':'🔮','Isekai':'🌀','Historical':'🏯','System':'💻','Regression':'⏪','Reincarnation':'♻️','Martial Arts':'👊','School':'🏫','Horror':'💀','Comedy':'😂','Mystery':'🔍','Sci-Fi':'🚀','Slice of Life':'☕','Dungeon':'🐉','Villainess':'👑','Murim':'🥋','Hunter':'🗡️'};
